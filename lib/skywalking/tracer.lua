@@ -31,7 +31,12 @@ local Tracer = {}
 
 
 function Tracer:start(upstream_name, correlation)
-    local serviceName = metadata_shdict:get("serviceName")
+    local parentService = 'user'
+    local parts = Util.split(ngx.var.http_sw8, '-')
+    if #parts == 8 then
+        parentService = Util.decode_base64(parts[5])
+    end
+    local serviceName = metadata_shdict:get("serviceName") .. '-' .. parentService
     local serviceInstanceName = metadata_shdict:get('serviceInstanceName')
     local includeHostInEntrySpan = metadata_shdict:get('includeHostInEntrySpan')
     local tracingContext = TC.new(serviceName, serviceInstanceName)
@@ -69,6 +74,8 @@ function Tracer:start(upstream_name, correlation)
     Span.start(exitSpan, time_now)
     Span.setComponentId(exitSpan, nginxComponentId)
     Span.setLayer(exitSpan, Layer.HTTP)
+    
+    Span.tag(exitSpan, 'parent.service', parentService)
 
     for name, value in pairs(contextCarrier) do
         ngx.req.set_header(name, value)
